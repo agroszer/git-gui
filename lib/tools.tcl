@@ -11,65 +11,87 @@ proc tools_list {} {
 }
 
 proc tools_populate_all {} {
-	global tools_menubar tools_menutbl
-	global tools_tailcnt
-
-	set mbar_end [$tools_menubar index end]
-	set mbar_base [expr {$mbar_end - $tools_tailcnt}]
-	if {$mbar_base >= 0} {
-		$tools_menubar delete 0 $mbar_base
-	}
+	global tools_menubar tools_tailcnt tools_menus tools_menutbl
 
 	array unset tools_menutbl
 
-	foreach fullname [tools_list] {
-		tools_populate_one $fullname
+	set targets [list]
+	if {[info exists tools_menubar]} {
+		lappend targets [list $tools_menubar $tools_tailcnt]
+	}
+	if {[info exists tools_menus]} {
+		foreach m $tools_menus {
+			lappend targets [list $m 0]
+		}
+	}
+
+	set tlist [tools_list]
+	foreach item $targets {
+		set target_menu [lindex $item 0]
+		set tailcnt [lindex $item 1]
+		if {![winfo exists $target_menu]} continue
+
+		set m_end [$target_menu index end]
+		if {$m_end ne {} && $m_end ne {none}} {
+			set m_base [expr {$m_end - $tailcnt}]
+			if {$m_base >= 0} {
+				$target_menu delete 0 $m_base
+			}
+		}
+
+		foreach fullname $tlist {
+			tools_populate_one $target_menu $tailcnt $fullname
+		}
 	}
 }
 
-proc tools_create_item {parent args} {
-	global tools_menubar tools_tailcnt
-	if {$parent eq $tools_menubar} {
-		set pos [expr {[$parent index end]-$tools_tailcnt+1}]
+proc tools_create_item {parent target_menu tailcnt args} {
+	if {$parent eq $target_menu} {
+		set m_end [$parent index end]
+		if {$m_end eq {} || $m_end eq {none}} {
+			set pos 0
+		} else {
+			set pos [expr {$m_end - $tailcnt + 1}]
+		}
 		eval [list $parent insert $pos] $args
 	} else {
 		eval [list $parent add] $args
 	}
 }
 
-proc tools_populate_one {fullname} {
-	global tools_menubar tools_menutbl tools_id
+proc tools_populate_one {target_menu tailcnt fullname} {
+	global tools_menutbl tools_id
 
 	if {![info exists tools_id]} {
 		set tools_id 0
 	}
 
 	set names [split $fullname '/']
-	set parent $tools_menubar
+	set parent $target_menu
 	for {set i 0} {$i < [llength $names]-1} {incr i} {
 		set subname [join [lrange $names 0 $i] '/']
-		if {[info exists tools_menutbl($subname)]} {
-			set parent $tools_menutbl($subname)
+		if {[info exists tools_menutbl($target_menu,$subname)]} {
+			set parent $tools_menutbl($target_menu,$subname)
 		} else {
 			set subid $parent.t$tools_id
-			tools_create_item $parent cascade \
+			tools_create_item $parent $target_menu $tailcnt cascade \
 					-label [lindex $names $i] -menu $subid
 			menu $subid
-			set tools_menutbl($subname) $subid
+			set tools_menutbl($target_menu,$subname) $subid
 			set parent $subid
 			incr tools_id
 		}
 	}
 
-	tools_create_item $parent command \
+	tools_create_item $parent $target_menu $tailcnt command \
 		-label [lindex $names end] \
 		-command [list tools_exec $fullname]
 }
 
-proc tools_exec {fullname} {
+proc tools_exec {fullname {line {}}} {
 	global repo_config env current_diff_path
 	global current_branch is_detached
-	global selected_paths
+	global selected_paths cursorX cursorY
 
 	if {[is_config_true "guitool.$fullname.needsfile"]} {
 		if {$current_diff_path eq {}} {
@@ -108,6 +130,19 @@ proc tools_exec {fullname} {
 		set env(CUR_BRANCH) $current_branch
 	}
 
+	if {$line eq {}} {
+		catch {
+			set line [diff_find_line \
+				[expr {[info exists cursorX] ? $cursorX : 0}] \
+				[expr {[info exists cursorY] ? $cursorY : 0}]]
+		}
+	}
+	if {$line ne {}} {
+		set env(LINE) $line
+	} else {
+		catch { unset env(LINE) }
+	}
+
 	set cmdline $repo_config(guitool.$fullname.cmd)
 	if {[is_config_true "guitool.$fullname.noconsole"]} {
 		tools_run_silent [list [shellpath] -c $cmdline] \
@@ -127,6 +162,7 @@ proc tools_exec {fullname} {
 	unset env(CUR_BRANCH)
 	catch { unset env(ARGS) }
 	catch { unset env(REVISION) }
+	catch { unset env(LINE) }
 }
 
 proc tools_run_silent {cmd after} {

@@ -846,6 +846,42 @@ proc apply_or_revert_range_or_line {x y revert} {
 	unlock_index
 }
 
+proc diff_find_line {x y} {
+	global ui_diff
+
+	set selected [$ui_diff tag nextrange sel 0.0]
+	if {$selected == {}} {
+		set first [$ui_diff index "@$x,$y"]
+	} else {
+		set first [lindex $selected 0]
+	}
+
+	set first_l [$ui_diff index "$first linestart"]
+	set i_l [$ui_diff search -backwards -regexp {^@@+} "$first_l + 1 lines" 0.0]
+	if {$i_l eq {}} {
+		return {}
+	}
+	set hh [$ui_diff get $i_l "$i_l lineend"]
+	if {![regexp {^@@+ (?:-[0-9]+(?:,[0-9]+)? )+\+([0-9]+)} $hh all lno]} {
+		return {}
+	}
+	if {[$ui_diff compare $first_l == $i_l]} {
+		return $lno
+	}
+	set cur_l [$ui_diff index "$i_l + 1 line"]
+	while {[$ui_diff compare $cur_l < $first_l]} {
+		set c [$ui_diff get $cur_l]
+		if {$c eq {@}} {
+			break
+		}
+		if {![regexp {^-} $c]} {
+			incr lno
+		}
+		set cur_l [$ui_diff index "$cur_l + 1 line"]
+	}
+	return $lno
+}
+
 # Undo the last line/hunk reverted. When hunks and lines are reverted, a copy
 # of the diff applied is saved. Re-apply that diff to undo the revert.
 #

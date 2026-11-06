@@ -2918,9 +2918,6 @@ if {[is_enabled multicommit] || [is_enabled singlecommit]} {
 	$tools_menubar add command -label [mc "Add..."] -command tools_add::dialog
 	$tools_menubar add command -label [mc "Remove..."] -command tools_remove::dialog
 	set tools_tailcnt 3
-	if {[array names repo_config guitool.*.cmd] ne {}} {
-		tools_populate_all
-	}
 }
 
 # -- Help Menu
@@ -3437,6 +3434,16 @@ $ctxm add command \
 	-label [mc Open] \
 	-command {do_file_open $current_diff_path}
 lappend diff_actions [list $ctxm entryconf [$ctxm index last] -state]
+if {[is_enabled multicommit] || [is_enabled singlecommit]} {
+	$ctxm add separator
+	set tmenu $ctxm.tools
+	menu $tmenu
+	$ctxm add cascade \
+		-label [mc "Tools"] \
+		-menu $tmenu
+	lappend diff_actions [list $ctxm entryconf [$ctxm index last] -state]
+	lappend tools_menus $tmenu
+}
 bind_button3 .vpane.lower.diff.header.path "tk_popup $ctxm %X %Y"
 bind .vpane.lower.diff.header.path <Button-1> {do_file_open $current_diff_path}
 
@@ -3553,6 +3560,17 @@ proc create_common_diff_popup {ctxm} {
 		-menu $emenu
 	lappend diff_actions [list $ctxm entryconf [$ctxm index last] -state]
 	$ctxm add separator
+	if {[is_enabled multicommit] || [is_enabled singlecommit]} {
+		global tools_menus
+		set tmenu $ctxm.tools
+		menu $tmenu
+		$ctxm add cascade \
+			-label [mc "Tools"] \
+			-menu $tmenu
+		lappend diff_actions [list $ctxm entryconf [$ctxm index last] -state]
+		lappend tools_menus $tmenu
+		$ctxm add separator
+	}
 	$ctxm add command -label [mc "Options..."] \
 		-command do_options
 }
@@ -3743,6 +3761,12 @@ proc popup_diff_menu {ctxm ctxmmg ctxmsm x y X Y} {
 	}
 }
 bind_button3 $ui_diff [list popup_diff_menu $ctxm $ctxmmg $ctxmsm %x %y %X %Y]
+
+if {[is_enabled multicommit] || [is_enabled singlecommit]} {
+	if {[array names repo_config guitool.*.cmd] ne {}} {
+		tools_populate_all
+	}
+}
 
 # -- Status Bar
 #
