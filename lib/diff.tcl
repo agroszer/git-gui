@@ -882,6 +882,50 @@ proc diff_find_line {x y} {
 	return $lno
 }
 
+proc diff_find_word {x y} {
+	global ui_diff
+
+	if {![winfo exists $ui_diff]} {
+		return {}
+	}
+
+	set selected [$ui_diff tag nextrange sel 0.0]
+	if {$selected ne {}} {
+		return [string trim [$ui_diff get [lindex $selected 0] [lindex $selected 1]]]
+	}
+
+	set pos [$ui_diff index "@$x,$y"]
+	set bbox [$ui_diff bbox $pos]
+	if {$bbox ne {}} {
+		set bx [lindex $bbox 0]
+		set bw [lindex $bbox 2]
+		if {$x > [expr {$bx + $bw}]} {
+			return {}
+		}
+	}
+
+	set word [$ui_diff get "$pos wordstart" "$pos wordend"]
+	if {[regexp {[\w]} $word]} {
+		return [string trim $word]
+	}
+
+	if {[$ui_diff compare $pos > "$pos linestart"]} {
+		set prev_word [$ui_diff get "$pos - 1 char wordstart" "$pos - 1 char wordend"]
+		if {[regexp {[\w]} $prev_word]} {
+			return [string trim $prev_word]
+		}
+	}
+
+	if {[$ui_diff compare $pos < "$pos lineend"]} {
+		set next_word [$ui_diff get "$pos + 1 char wordstart" "$pos + 1 char wordend"]
+		if {[regexp {[\w]} $next_word]} {
+			return [string trim $next_word]
+		}
+	}
+
+	return {}
+}
+
 # Undo the last line/hunk reverted. When hunks and lines are reverted, a copy
 # of the diff applied is saved. Re-apply that diff to undo the revert.
 #

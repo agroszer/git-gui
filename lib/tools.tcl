@@ -102,6 +102,9 @@ proc tools_exec {fullname {line {}}} {
 
 	catch { unset env(ARGS) }
 	catch { unset env(REVISION) }
+	if {[info exists env(WORD)]} {
+		unset env(WORD)
+	}
 
 	if {[get_config "guitool.$fullname.revprompt"] ne {} ||
 	    [get_config "guitool.$fullname.argprompt"] ne {}} {
@@ -130,17 +133,27 @@ proc tools_exec {fullname {line {}}} {
 		set env(CUR_BRANCH) $current_branch
 	}
 
+	set cur_x [expr {[info exists cursorX] ? $cursorX : 0}]
+	set cur_y [expr {[info exists cursorY] ? $cursorY : 0}]
+
 	if {$line eq {}} {
 		catch {
-			set line [diff_find_line \
-				[expr {[info exists cursorX] ? $cursorX : 0}] \
-				[expr {[info exists cursorY] ? $cursorY : 0}]]
+			set line [diff_find_line $cur_x $cur_y]
 		}
 	}
 	if {$line ne {}} {
 		set env(LINE) $line
 	} else {
 		catch { unset env(LINE) }
+	}
+
+	set word [diff_find_word $cur_x $cur_y]
+	if {$word ne {}} {
+		set env(WORD) $word
+	} else {
+		if {[info exists env(WORD)]} {
+			unset env(WORD)
+		}
 	}
 
 	set cmdline $repo_config(guitool.$fullname.cmd)
@@ -163,6 +176,9 @@ proc tools_exec {fullname {line {}}} {
 	catch { unset env(ARGS) }
 	catch { unset env(REVISION) }
 	catch { unset env(LINE) }
+	if {[info exists env(WORD)]} {
+		unset env(WORD)
+	}
 }
 
 proc tools_run_silent {cmd after} {
